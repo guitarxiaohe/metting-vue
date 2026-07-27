@@ -67,7 +67,7 @@
         </div>
 
         <!-------------------------- 登录注册切换 -------------------------->
-        <div class="mode-switch">
+        <!-- <div class="mode-switch">
           <button
             type="button"
             class="mode-btn"
@@ -84,7 +84,7 @@
           >
             {{ t('login.register') }}
           </button>
-        </div>
+        </div> -->
 
         <!-- 登录表单 -->
         <form @submit.prevent="handleSubmit" class="login-form">
@@ -147,9 +147,9 @@
               <input type="checkbox" v-model="rememberMe" />
               <span>{{ t('login.rememberFor30Days') }}</span>
             </label>
-            <button type="button" class="forgot-link">
+            <!-- <button type="button" class="forgot-link">
               {{ t('user.forgotPassword') }}
-            </button>
+            </button> -->
           </div>
 
           <div v-if="error" class="error-message">

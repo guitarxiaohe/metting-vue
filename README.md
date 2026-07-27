@@ -6,8 +6,8 @@ XiaoHe Frontend 是一个基于 `Vue 3 + TypeScript + Vite` 的配置化后台�
 ## 线上演示
 
 - 演示地址：[https://www.guitarxiaohe.top](https://www.guitarxiaohe.top)
-- 测试账号：`test`
-- 测试密码：`123456`
+- 测试账号：使用微信扫码登录
+- 测试密码：使用微信扫码登录
 
 ## 核心特点
 

@@ -27,9 +27,13 @@ import { useUserStore } from '@/stores';
 const cameraVideoRef = ref<Record<string, HTMLDivElement | null>>({});
 interface UseMeetingCameraOptions {
   room: ShallowRef<Room | null>;
+  /** 当前连接状态 */
   connectionState: Ref<ConnectionState>;
+  /** 摄像头开启关闭状态 */
   isCameraEnabled: Ref<boolean>;
+  /** 开启关闭摄像头方法 */
   toggleCamera: () => Promise<void>;
+  /** 摄像头视频流 */
   localVideoTrack: ShallowRef<LocalVideoTrack | null>;
   remoteCameraTracks: ShallowRef<Map<string, RemoteVideoTrack>>;
 }
@@ -196,6 +200,7 @@ export function useMeetingCamera(options: UseMeetingCameraOptions) {
 
   /******************************** 页面生命周期 ********************************/
 
+  // 在浏览器关闭 刷新等其他因素导致异常关闭的情况兜底
   function handleCameraPageHide() {
     const meetingId = currentMeetingId.value;
     if (meetingId && isCameraEnabled.value) {
@@ -205,12 +210,15 @@ export function useMeetingCamera(options: UseMeetingCameraOptions) {
 
   onMounted(() => {
     window.addEventListener('pagehide', handleCameraPageHide);
+    document.addEventListener('visibilitychange', handleCameraPageHide);
     window.addEventListener('beforeunload', handleCameraPageHide);
   });
 
   onBeforeUnmount(() => {
     window.removeEventListener('pagehide', handleCameraPageHide);
+    document.addEventListener('visibilitychange', handleCameraPageHide);
     window.removeEventListener('beforeunload', handleCameraPageHide);
+    // clearCameraTrack()
   });
 
   return {
