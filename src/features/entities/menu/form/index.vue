@@ -1,0 +1,710 @@
+<script setup lang="ts">
+import { computed, ref, watch } from 'vue';
+import { useQuery, useQueryClient } from '@tanstack/vue-query';
+import { useI18n } from 'vue-i18n';
+import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
+import DetailDrawer from '@/features/form-shell/components/form-drawer.vue';
+import {
+  addMenu,
+  assertAjaxOk,
+  fetchMenuTreeSelect,
+  getMenu,
+  MENU_TREESELECT_QUERY_KEY,
+  updateMenu,
+} from '@/api/modules/menu';
+import type {
+  MenuTreeSelectOption,
+  SysMenu,
+  SysMenuFormData,
+} from '@/types/menu';
+import type {
+  EntityFormEmits,
+  EntityFormProps,
+} from '@/features/entities/_shared/types';
+import { MENU_ICON_OPTIONS, resolveMenuIcon } from './menu-icons';
+
+/******************************** 组件入参 ********************************/
+
+const props = defineProps<EntityFormProps>();
+const emit = defineEmits<EntityFormEmits>();
+const { t } = useI18n();
+const queryClient = useQueryClient();
+
+/******************************** 基础状态 ********************************/
+
+const formRef = ref<FormInstance>();
+const saving = ref<boolean>(false);
+const formData = ref<SysMenuFormData>(createDefaultFormData());
+
+const { data: parentOptionsData } = useQuery({
+  queryKey: MENU_TREESELECT_QUERY_KEY,
+  queryFn: fetchMenuTreeSelect,
+  enabled: computed(() => props.visible),
+  staleTime: 5 * 60 * 1000,
+  gcTime: 30 * 60 * 1000,
+  retry: 0,
+  refetchOnMount: false,
+  refetchOnReconnect: false,
+  refetchOnWindowFocus: false,
+});
+
+const drawerTitle = computed(() => {
+  if (props.isCreate && props.record) {
+    return t('menuPage.createChildTitle');
+  }
+
+  return props.isCreate ? t('menuPage.createTitle') : t('menuPage.editTitle');
+});
+
+const localeOptions = computed(() => [
+  { label: t('locale.zhCN'), value: 'zh-CN' as const },
+  { label: t('locale.enUS'), value: 'en-US' as const },
+  { label: t('locale.zhTW'), value: 'zh-TW' as const },
+]);
+
+const menuTypeOptions = computed(() => [
+  { label: t('menuPage.typeDirectory'), value: 'M' },
+  { label: t('menuPage.typeMenu'), value: 'C' },
+  { label: t('menuPage.typeButton'), value: 'F' },
+]);
+
+const previewIcon = computed(() =>
+  resolveMenuIcon(formData.value.icon || 'Menu')
+);
+const parentOptions = computed<MenuTreeSelectOption[]>(
+  () => parentOptionsData.value ?? []
+);
+const isDirectoryType = computed(() => formData.value.menuType === 'M');
+const isMenuType = computed(() => formData.value.menuType === 'C');
+const isButtonType = computed(() => formData.value.menuType === 'F');
+const isExternalLink = computed(() => String(formData.value.isFrame) === '0');
+
+const filteredParentOptions = computed(() => {
+  if (!formData.value.menuId) {
+    return parentOptions.value;
+  }
+
+  const currentId = Number(formData.value.menuId);
+  const blockedIds = new Set<number>([currentId]);
+
+  const markDescendants = (menus: MenuTreeSelectOption[]) => {
+    menus.forEach((menu) => {
+      const menuId = Number(menu.id);
+      if (blockedIds.has(menuId)) {
+        const collectAll = (children: MenuTreeSelectOption[]) => {
+          children.forEach((child) => {
+            blockedIds.add(Number(child.id));
+            if (child.children?.length) {
+              collectAll(child.children);
+            }
+          });
+        };
+
+        if (menu.children?.length) {
+          collectAll(menu.children);
+        }
+      }
+
+      if (menu.children?.length) {
+        markDescendants(menu.children);
+      }
+    });
+  };
+
+  markDescendants(parentOptions.value);
+
+  const filterTree = (
+    menus: MenuTreeSelectOption[]
+  ): MenuTreeSelectOption[] => {
+    return menus.flatMap((menu) => {
+      if (blockedIds.has(Number(menu.id))) {
+        return [];
+      }
+
+      return [
+        {
+          ...menu,
+          children: menu.children?.length ? filterTree(menu.children) : [],
+        },
+      ];
+    });
+  };
+
+  return filterTree(parentOptions.value);
+});
+
+const formRules = computed<FormRules>(() => ({
+  orderNum: [
+    {
+      required: true,
+      message: t('validation.enterField', { field: t('menuPage.orderNum') }),
+      trigger: 'blur',
+    },
+  ],
+  menuType: [
+    {
+      required: true,
+      message: t('validation.selectField', { field: t('menuPage.menuType') }),
+      trigger: 'change',
+    },
+  ],
+  path: [
+    {
+      validator: (_rule, value, callback) => {
+        if (
+          (isDirectoryType.value || isMenuType.value) &&
+          !String(value ?? '').trim()
+        ) {
+          callback(
+            new Error(t('validation.enterField', { field: t('menuPage.path') }))
+          );
+          return;
+        }
+        callback();
+      },
+      trigger: 'blur',
+    },
+  ],
+  // component: [
+  //   {
+  //     validator: (_rule, value, callback) => {
+  //       if (
+  //         !isButtonType.value &&
+  //         !isExternalLink.value &&
+  //         !String(value ?? '').trim()
+  //       ) {
+  //         callback(
+  //           new Error(
+  //             t('validation.enterField', { field: t('menuPage.component') })
+  //           )
+  //         );
+  //         return;
+  //       }
+  //       callback();
+  //     },
+  //     trigger: 'blur',
+  //   },
+  // ],
+  perms: [
+    {
+      validator: (_rule, value, callback) => {
+        if (isButtonType.value && !String(value ?? '').trim()) {
+          callback(
+            new Error(
+              t('validation.enterField', { field: t('menuPage.permission') })
+            )
+          );
+          return;
+        }
+        callback();
+      },
+      trigger: 'blur',
+    },
+  ],
+}));
+
+/******************************** 数据方法 ********************************/
+
+// 创建默认表单
+function createDefaultFormData(): SysMenuFormData {
+  return {
+    menuId: undefined,
+    menuName: '',
+    parentId: 0,
+    orderNum: 1,
+    path: '',
+    component: '',
+    query: '',
+    routeName: '',
+    isFrame: 1,
+    isCache: 0,
+    menuType: 'C',
+    visible: '0',
+    status: '0',
+    perms: '',
+    icon: 'House',
+    remark: '',
+    localeNames: [{ locale: 'zh-CN', label: '' }],
+  };
+}
+
+// 克隆表单数据
+function cloneFormData(record?: Record<string, unknown>) {
+  const source = (record ?? {}) as Partial<SysMenuFormData>;
+  return {
+    ...createDefaultFormData(),
+    ...source,
+    parentId: Number(source.parentId ?? 0),
+    orderNum: Number(source.orderNum ?? 1),
+    localeNames: source.localeNames?.length
+      ? source.localeNames.map((item) => ({ ...item }))
+      : [{ locale: 'zh-CN', label: String(source.menuName ?? '') }],
+  } as SysMenuFormData;
+}
+
+// 同步中文主名称
+function syncMenuName() {
+  const zhRow = formData.value.localeNames.find(
+    (item) => item.locale === 'zh-CN'
+  );
+  const fallback = formData.value.localeNames.find((item) => item.label.trim());
+  formData.value.menuName = zhRow?.label.trim() || fallback?.label.trim() || '';
+}
+
+// 新增语言行
+function addLocaleRow() {
+  const usedLocales = new Set(
+    formData.value.localeNames.map((item) => item.locale)
+  );
+  const nextLocale = localeOptions.value.find(
+    (item) => !usedLocales.has(item.value)
+  );
+
+  if (!nextLocale) {
+    ElMessage.warning(t('menuPage.localeFull'));
+    return;
+  }
+
+  formData.value.localeNames.push({
+    locale: nextLocale.value,
+    label: '',
+  });
+}
+
+// 删除语言行
+function removeLocaleRow(index: number) {
+  if (formData.value.localeNames.length <= 1) {
+    return;
+  }
+
+  formData.value.localeNames.splice(index, 1);
+  syncMenuName();
+}
+
+// 校验表单
+async function validateForm() {
+  syncMenuName();
+
+  if (!formData.value.menuName.trim()) {
+    ElMessage.warning(
+      t('validation.enterField', { field: t('menuPage.menuName') })
+    );
+    throw new Error('menuName required');
+  }
+
+  await formRef.value?.validate();
+}
+
+function clearFormValidation() {
+  formRef.value?.clearValidate();
+}
+
+function normalizeNullableText(value: unknown) {
+  const text = String(value ?? '').trim();
+  return text ? text : null;
+}
+
+function buildSubmitPayload(): SysMenu {
+  const remarkText = String(formData.value.remark ?? '').trim();
+  const iconText = String(formData.value.icon ?? '').trim();
+
+  syncMenuName();
+
+  return {
+    menuId: formData.value.menuId,
+    menuName: formData.value.menuName.trim(),
+    parentId: Number(formData.value.parentId ?? 0),
+    orderNum: Number(formData.value.orderNum ?? 0),
+    path: isButtonType.value ? '' : String(formData.value.path ?? '').trim(),
+    component:
+      isButtonType.value || isExternalLink.value
+        ? null
+        : normalizeNullableText(formData.value.component),
+    query:
+      isMenuType.value && !isExternalLink.value
+        ? normalizeNullableText(formData.value.query)
+        : null,
+    isFrame: Number(formData.value.isFrame ?? 1) as 0 | 1,
+    isCache: (isMenuType.value ? Number(formData.value.isCache ?? 1) : 1) as
+      | 0
+      | 1,
+    menuType: formData.value.menuType ?? 'C',
+    visible: (formData.value.visible ?? '0') as '0' | '1',
+    status: (formData.value.status ?? '0') as '0' | '1',
+    perms:
+      isButtonType.value || isMenuType.value
+        ? normalizeNullableText(formData.value.perms)
+        : null,
+    icon: isButtonType.value ? '' : iconText,
+    remark: remarkText,
+  };
+}
+
+// 提交表单
+async function handleSave() {
+  saving.value = true;
+
+  try {
+    const payload = buildSubmitPayload();
+
+    if (props.isCreate) {
+      const response = await addMenu(payload);
+      assertAjaxOk(response as { code?: number; msg?: string });
+    } else {
+      const response = await updateMenu(payload);
+      assertAjaxOk(response as { code?: number; msg?: string });
+    }
+
+    await queryClient.invalidateQueries({
+      queryKey: MENU_TREESELECT_QUERY_KEY,
+    });
+    emit('save', payload as unknown as Record<string, unknown>);
+    emit('update:visible', false);
+  } finally {
+    saving.value = false;
+  }
+}
+
+// 关闭抽屉
+function handleCancel() {
+  emit('update:visible', false);
+  emit('cancel');
+}
+
+/******************************** 监听 ********************************/
+
+watch(
+  () => props.visible,
+  async (visible) => {
+    if (!visible) {
+      return;
+    }
+
+    const menuId = Number(props.record?.menuId ?? 0);
+    if (!props.isCreate && menuId > 0) {
+      const response = (await getMenu(menuId)) as {
+        code?: number;
+        msg?: string;
+        message?: string;
+        data?: SysMenu;
+      };
+      assertAjaxOk(response);
+      formData.value = cloneFormData(
+        (response.data ?? props.record ?? {}) as Record<string, unknown>
+      );
+    } else {
+      formData.value = cloneFormData(props.record);
+    }
+    clearFormValidation();
+  },
+  { immediate: true }
+);
+
+watch(
+  () => formData.value.menuType,
+  (menuType) => {
+    if (menuType === 'F') {
+      formData.value.path = '';
+      formData.value.component = '';
+      formData.value.query = '';
+      formData.value.isCache = 1;
+      formData.value.icon = '';
+      return;
+    }
+
+    if (menuType === 'M') {
+      formData.value.query = '';
+      formData.value.perms = '';
+      formData.value.isCache = 1;
+      if (!formData.value.component) {
+        formData.value.component = 'Layout';
+      }
+      if (!formData.value.icon) {
+        formData.value.icon = 'Menu';
+      }
+      return;
+    }
+
+    if (!formData.value.component) {
+      formData.value.component = 'ParentView';
+    }
+    if (!formData.value.icon) {
+      formData.value.icon = 'Menu';
+    }
+  }
+);
+</script>
+
+<template>
+  <DetailDrawer
+    v-model:form-data="formData"
+    :visible="props.visible"
+    :record="props.record"
+    :record-list="props.recordList"
+    :initial-index="props.initialIndex"
+    :is-create="props.isCreate"
+    :title="drawerTitle"
+    :saving="saving"
+    size="520px"
+    :custom-validate="validateForm"
+    :custom-clear-validate="clearFormValidation"
+    @save="handleSave"
+    @cancel="handleCancel"
+    @update:visible="emit('update:visible', $event)"
+  >
+    <template #content>
+      <div class="menu-form">
+        <el-form
+          ref="formRef"
+          :model="formData"
+          :rules="formRules"
+          label-position="top"
+        >
+          <!-------------------------- 基础字段 -------------------------->
+          <el-form-item :label="t('menuPage.parentMenu')">
+            <el-tree-select
+              v-model="formData.parentId"
+              :data="filteredParentOptions"
+              node-key="id"
+              :props="{
+                label: 'label',
+                value: 'id',
+                children: 'children',
+              }"
+              check-strictly
+              clearable
+              style="width: 100%"
+            />
+          </el-form-item>
+
+          <el-form-item :label="t('menuPage.menuType')" prop="menuType">
+            <el-select v-model="formData.menuType" style="width: 100%">
+              <el-option
+                v-for="item in menuTypeOptions"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
+          </el-form-item>
+
+          <!-------------------------- 语言名称 -------------------------->
+          <div class="menu-form__block">
+            <div class="menu-form__header">
+              <span>{{ t('menuPage.menuName') }}</span>
+              <el-button text @click="addLocaleRow">
+                {{ t('menuPage.addLocale') }}
+              </el-button>
+            </div>
+
+            <div
+              v-for="(item, index) in formData.localeNames"
+              :key="`${item.locale}-${index}`"
+              class="menu-form__locale-row"
+            >
+              <el-select v-model="item.locale" style="width: 120px">
+                <el-option
+                  v-for="locale in localeOptions"
+                  :key="locale.value"
+                  :label="locale.label"
+                  :value="locale.value"
+                />
+              </el-select>
+              <el-input
+                v-model="item.label"
+                :placeholder="
+                  t('validation.enterField', { field: t('menuPage.menuName') })
+                "
+                @blur="syncMenuName"
+              />
+              <el-button
+                :disabled="formData.localeNames.length <= 1"
+                text
+                @click="removeLocaleRow(index)"
+              >
+                {{ t('common.delete') }}
+              </el-button>
+            </div>
+          </div>
+
+          <el-form-item :label="t('menuPage.orderNum')" prop="orderNum">
+            <el-input-number
+              v-model="formData.orderNum"
+              :min="0"
+              :max="9999"
+              controls-position="right"
+              style="width: 100%"
+            />
+          </el-form-item>
+
+          <el-form-item v-if="!isButtonType" :label="t('menuPage.icon')">
+            <el-select v-model="formData.icon" style="width: 100%">
+              <el-option
+                v-for="item in MENU_ICON_OPTIONS"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              >
+                <div class="menu-form__icon-option">
+                  <component :is="item.component" :size="16" />
+                  <span>{{ item.label }}</span>
+                </div>
+              </el-option>
+            </el-select>
+
+            <div class="menu-form__icon-preview">
+              <component :is="previewIcon" :size="42" />
+            </div>
+          </el-form-item>
+
+          <el-form-item
+            v-if="isDirectoryType || isMenuType"
+            :label="t('menuPage.path')"
+            prop="path"
+          >
+            <el-input v-model="formData.path" clearable />
+          </el-form-item>
+
+          <el-form-item
+            v-if="!isButtonType"
+            :label="t('menuPage.component')"
+            prop="component"
+          >
+            <el-input v-model="formData.component" clearable />
+          </el-form-item>
+
+          <el-form-item v-if="false" :label="t('menuPage.routeName')">
+            <el-input v-model="formData.routeName" clearable />
+          </el-form-item>
+
+          <el-form-item
+            v-if="isMenuType && !isExternalLink"
+            :label="t('menuPage.query')"
+          >
+            <el-input v-model="formData.query" clearable />
+          </el-form-item>
+
+          <el-form-item
+            v-if="isMenuType || isButtonType"
+            :label="t('menuPage.permission')"
+            prop="perms"
+          >
+            <el-input v-model="formData.perms" clearable />
+          </el-form-item>
+
+          <!-------------------------- 状态开关 -------------------------->
+          <div class="menu-form__switches">
+            <div class="menu-form__switch-item">
+              <span>{{ t('menuPage.visible') }}</span>
+              <el-switch
+                v-model="formData.visible"
+                active-value="0"
+                inactive-value="1"
+              />
+            </div>
+
+            <div class="menu-form__switch-item">
+              <span>{{ t('menuPage.status') }}</span>
+              <el-switch
+                v-model="formData.status"
+                active-value="0"
+                inactive-value="1"
+              />
+            </div>
+
+            <div v-if="isMenuType" class="menu-form__switch-item">
+              <span>{{ t('menuPage.cache') }}</span>
+              <el-switch
+                v-model="formData.isCache"
+                :active-value="0"
+                :inactive-value="1"
+              />
+            </div>
+
+            <div v-if="!isButtonType" class="menu-form__switch-item">
+              <span>{{ t('menuPage.frame') }}</span>
+              <el-switch
+                v-model="formData.isFrame"
+                :active-value="1"
+                :inactive-value="0"
+              />
+            </div>
+          </div>
+
+          <el-form-item :label="t('menuPage.remark')">
+            <el-input v-model="formData.remark" type="textarea" :rows="4" />
+          </el-form-item>
+        </el-form>
+      </div>
+    </template>
+  </DetailDrawer>
+</template>
+
+<style scoped lang="scss">
+.menu-form__block {
+  margin-bottom: 18px;
+}
+
+.menu-form__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.menu-form__locale-row {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr) 54px;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.menu-form__icon-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.menu-form__icon-preview {
+  width: 84px;
+  height: 84px;
+  margin-top: 14px;
+  border: 1px dashed var(--el-border-color);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-primary);
+  background: var(--color-bg-page);
+}
+
+.menu-form__switches {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.menu-form__switch-item {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--color-text-primary);
+}
+
+@media (max-width: 640px) {
+  .menu-form__locale-row {
+    grid-template-columns: 1fr;
+  }
+
+  .menu-form__switches {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

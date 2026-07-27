@@ -1,0 +1,491 @@
+<script setup lang="ts">
+import { computed, isProxy, nextTick, ref, toRaw, useSlots, watch } from 'vue';
+import { ElMessage } from 'element-plus';
+import { useI18n } from 'vue-i18n';
+import FormDrawerForm from './form-drawer-form.vue';
+import type { DetailField, DetailRecord } from '../types/detail';
+import type { EntityTableChildConfig } from '@/types/entity-config';
+import RowDetailChildTable from '@/components/table-entity/row-detail-child-table.vue';
+
+/******************************** 类型定义 ********************************/
+
+interface FormDrawerProps {
+  visible: boolean;
+  record?: DetailRecord;
+  recordList?: DetailRecord[];
+  fields?: DetailField[];
+  columns?: number;
+  initialIndex?: number;
+  title?: string;
+  isCreate?: boolean;
+  size?: string;
+  saving?: boolean;
+  showNavigation?: boolean;
+  formData?: DetailRecord;
+  saveText?: string;
+  childTables?: EntityTableChildConfig[];
+  customValidate?: () => Promise<boolean | void> | boolean | void;
+  customClearValidate?: () => void;
+}
+
+interface FormDrawerFormInstance {
+  validate: () => Promise<boolean>;
+  formRef: {
+    clearValidate: (fields?: string[]) => void;
+  } | null;
+}
+
+/******************************** 组件入参 ********************************/
+
+const props = withDefaults(defineProps<FormDrawerProps>(), {
+  record: undefined,
+  recordList: () => [],
+  fields: () => [] as DetailField[],
+  columns: 1,
+  initialIndex: 0,
+  title: '',
+  isCreate: false,
+  size: '456px',
+  saving: false,
+  showNavigation: true,
+  formData: undefined,
+  saveText: '',
+  childTables: () => [],
+  customValidate: undefined,
+  customClearValidate: undefined,
+});
+
+const emits = defineEmits<{
+  (e: 'update:visible', value: boolean): void;
+  (e: 'save', record: DetailRecord, index: number): void;
+  (e: 'cancel'): void;
+  (e: 'index-change', index: number): void;
+  (e: 'update:form-data', value: DetailRecord): void;
+}>();
+
+const { t } = useI18n();
+const slots = useSlots();
+
+/******************************** 基础状态 ********************************/
+
+const formComp = ref<FormDrawerFormInstance | null>(null);
+const internalFormData = ref<DetailRecord>({});
+const currentIndex = ref<number>(props.initialIndex ?? 0);
+const syncingFromOuter = ref<boolean>(false);
+
+const resolvedTitle = computed(() => props.title || t('common.detail'));
+const activeChildTab = ref<string>('');
+const hasCustomContent = computed(() => Boolean(slots.content));
+const hasExtraContent = computed(() => Boolean(slots.extra));
+const hasChildTables = computed(() => (props.childTables?.length ?? 0) > 0);
+const resolvedSize = computed(() => {
+  if (hasChildTables.value && props.size === '456px') {
+    return '1080px';
+  }
+  return props.size;
+});
+const resolvedChildTables = computed(() => {
+  return (props.childTables ?? []).map((item, index) => ({
+    key: `${item.entityKey}-${index}`,
+    label:
+      item.labelKey && t(item.labelKey) !== item.labelKey
+        ? t(item.labelKey)
+        : item.label || item.entityKey,
+    config: item,
+  }));
+});
+const showChildTabs = computed(() => resolvedChildTables.value.length > 1);
+const activeRecord = computed<DetailRecord | undefined>(() =>
+  getCurrentRecord()
+);
+
+/******************************** 数据方法 ********************************/
+
+// 判断是否为普通对象
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (Object.prototype.toString.call(value) !== '[object Object]') {
+    return false;
+  }
+
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+// 递归复制可安全克隆的数据
+function cloneCloneableValue<T>(
+  value: T,
+  seen = new WeakMap<object, unknown>()
+): T {
+  if (value == null || typeof value !== 'object') {
+    return value;
+  }
+
+  const rawValue = isProxy(value) ? toRaw(value) : value;
+
+  if (seen.has(rawValue)) {
+    return seen.get(rawValue) as T;
+  }
+
+  if (rawValue instanceof Date) {
+    return new Date(rawValue.getTime()) as T;
+  }
+
+  if (rawValue instanceof RegExp) {
+    return new RegExp(rawValue) as T;
+  }
+
+  if (
+    rawValue instanceof File ||
+    rawValue instanceof Blob ||
+    rawValue instanceof ArrayBuffer
+  ) {
+    return rawValue;
+  }
+
+  if (Array.isArray(rawValue)) {
+    const result: unknown[] = [];
+    seen.set(rawValue, result);
+    rawValue.forEach((item) => {
+      result.push(cloneCloneableValue(item, seen));
+    });
+    return result as T;
+  }
+
+  if (rawValue instanceof Map) {
+    const result = new Map();
+    seen.set(rawValue, result);
+    rawValue.forEach((item, key) => {
+      result.set(
+        cloneCloneableValue(key, seen),
+        cloneCloneableValue(item, seen)
+      );
+    });
+    return result as T;
+  }
+
+  if (rawValue instanceof Set) {
+    const result = new Set();
+    seen.set(rawValue, result);
+    rawValue.forEach((item) => {
+      result.add(cloneCloneableValue(item, seen));
+    });
+    return result as T;
+  }
+
+  if (!isPlainObject(rawValue)) {
+    return rawValue;
+  }
+
+  const result: Record<string, unknown> = {};
+  seen.set(rawValue, result);
+
+  Object.entries(rawValue).forEach(([key, item]) => {
+    result[key] = cloneCloneableValue(item, seen);
+  });
+
+  return result as T;
+}
+
+// 复制记录数据，避免直接克隆响应式对象失败
+function cloneRecord<T>(value: T): T {
+  if (value == null) {
+    return value;
+  }
+
+  return cloneCloneableValue(value);
+}
+
+// 清除表单校验
+function clearFormValidation() {
+  props.customClearValidate?.();
+  formComp.value?.formRef?.clearValidate();
+}
+
+// 获取字段默认值
+function getInitialValueByField(field: DetailField) {
+  if (field.defaultValue !== undefined) {
+    return field.defaultValue;
+  }
+  if (field.type === 'number') {
+    return undefined;
+  }
+  if (field.type === 'checkbox') {
+    return [];
+  }
+  if (
+    field.type === 'select' ||
+    field.type === 'async-select' ||
+    field.type === 'async-cascader' ||
+    field.type === 'radio'
+  ) {
+    return field.type === 'async-cascader' ? [] : field.multiple ? [] : '';
+  }
+  if (field.type === 'switch') {
+    return false;
+  }
+  return '';
+}
+
+// 提取表单字段值
+function extractFormFields(
+  record: DetailRecord | undefined,
+  includeNonCopyable = false
+) {
+  const result: DetailRecord = {};
+
+  (props.fields ?? []).forEach((field) => {
+    if (!record) {
+      result[field.prop] = getInitialValueByField(field);
+      return;
+    }
+
+    if (props.isCreate && !includeNonCopyable && field.copyable === false) {
+      result[field.prop] = getInitialValueByField(field);
+      return;
+    }
+
+    const value = record[field.prop];
+    result[field.prop] =
+      value !== undefined ? cloneRecord(value) : getInitialValueByField(field);
+  });
+
+  return result;
+}
+
+function extractCustomFormData(record: DetailRecord | undefined) {
+  if (record) {
+    return cloneRecord(record);
+  }
+
+  if (props.formData) {
+    return cloneRecord(props.formData);
+  }
+
+  return {};
+}
+
+// 获取当前编辑记录
+function getCurrentRecord() {
+  if (props.isCreate) {
+    return props.record;
+  }
+
+  const listRecord = props.recordList?.[currentIndex.value];
+  return listRecord ?? props.record;
+}
+
+// 同步当前表单数据
+async function loadCurrent() {
+  const record = getCurrentRecord();
+
+  if (hasCustomContent.value) {
+    internalFormData.value = extractCustomFormData(record);
+  } else if (props.isCreate) {
+    internalFormData.value = extractFormFields(record);
+  } else {
+    internalFormData.value = extractFormFields(record, true);
+  }
+
+  await nextTick();
+  clearFormValidation();
+}
+
+// 保存表单
+async function handleSave() {
+  if (props.customValidate) {
+    try {
+      await props.customValidate();
+    } catch {
+      return;
+    }
+  } else if (formComp.value) {
+    try {
+      await formComp.value.validate();
+    } catch {
+      ElMessage.warning(t('form.validationFailed'));
+      return;
+    }
+  }
+
+  const submitRecord =
+    props.isCreate || !activeRecord.value
+      ? cloneRecord(internalFormData.value)
+      : {
+          ...cloneRecord(activeRecord.value),
+          ...cloneRecord(internalFormData.value),
+        };
+
+  emits('save', submitRecord, props.isCreate ? -1 : currentIndex.value);
+}
+
+// 取消编辑
+function handleCancel() {
+  clearFormValidation();
+  emits('update:visible', false);
+  emits('cancel');
+}
+
+/******************************** 监听 ********************************/
+
+watch(
+  () => props.formData,
+  (value) => {
+    if (!value || syncingFromOuter.value) return;
+    internalFormData.value = cloneRecord(value);
+  },
+  { deep: true }
+);
+
+watch(
+  internalFormData,
+  (value) => {
+    syncingFromOuter.value = true;
+    emits('update:form-data', cloneRecord(value));
+    nextTick(() => {
+      syncingFromOuter.value = false;
+    });
+  },
+  { deep: true }
+);
+
+watch(
+  () => props.visible,
+  async (visible) => {
+    if (!visible) {
+      clearFormValidation();
+      return;
+    }
+
+    currentIndex.value = props.initialIndex ?? 0;
+    await loadCurrent();
+    activeChildTab.value = resolvedChildTables.value[0]?.key ?? '';
+  },
+  { immediate: true }
+);
+
+watch(
+  () => props.record,
+  async () => {
+    if (!props.visible) return;
+    await loadCurrent();
+  },
+  { deep: true }
+);
+
+watch(currentIndex, async (value) => {
+  if (!props.visible || props.isCreate) return;
+  emits('index-change', value);
+  await loadCurrent();
+});
+</script>
+
+<template>
+  <el-drawer
+    :model-value="props.visible"
+    :title="resolvedTitle"
+    :size="resolvedSize"
+    direction="rtl"
+    @close="() => emits('update:visible', false)"
+  >
+    <div class="form-drawer">
+      <!-------------------------- 表单内容 -------------------------->
+      <slot
+        name="content"
+        :form-data="internalFormData"
+        :current-index="currentIndex"
+        :active-record="activeRecord"
+        :is-create="props.isCreate"
+      >
+        <FormDrawerForm
+          ref="formComp"
+          v-model:form-data="internalFormData"
+          :fields="props.fields"
+          :columns="props.columns"
+          :is-create="props.isCreate"
+        />
+      </slot>
+
+      <!-------------------------- 子表区域 -------------------------->
+      <div v-if="hasChildTables && false" class="form-drawer__children">
+        <el-tabs
+          v-if="showChildTabs"
+          v-model="activeChildTab"
+          class="form-drawer__tabs"
+        >
+          <el-tab-pane
+            v-for="child in resolvedChildTables"
+            :key="child.key"
+            :label="child.label"
+            :name="child.key"
+          >
+            <RowDetailChildTable
+              :config="child.config"
+              :row="internalFormData"
+              :show-title="false"
+            />
+          </el-tab-pane>
+        </el-tabs>
+
+        <RowDetailChildTable
+          v-else-if="resolvedChildTables[0]"
+          :config="resolvedChildTables[0].config"
+          :row="internalFormData"
+        />
+      </div>
+
+      <div v-if="hasExtraContent" class="form-drawer__extra">
+        <slot
+          name="extra"
+          :form-data="internalFormData"
+          :current-index="currentIndex"
+          :active-record="activeRecord"
+          :is-create="props.isCreate"
+        />
+      </div>
+
+      <!-------------------------- 底部操作 -------------------------->
+      <div class="form-drawer__footer">
+        <el-button @click="handleCancel">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="props.saving" @click="handleSave">
+          {{ props.saveText || t('common.save') }}
+        </el-button>
+      </div>
+    </div>
+  </el-drawer>
+</template>
+
+<style scoped lang="scss">
+.form-drawer {
+  position: relative;
+  min-height: 100%;
+  padding-left: 14px;
+}
+
+.form-drawer__nav {
+  position: absolute;
+  top: 6px;
+  left: -6px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-drawer__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 16px;
+}
+
+.form-drawer__children,
+.form-drawer__extra {
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.form-drawer__tabs:deep(.el-tabs__header) {
+  margin-bottom: 8px;
+}
+</style>
