@@ -44,7 +44,6 @@ src/
     modules/                     #   各业务模块 API
     query-client.ts              #   vue-query 客户端实例
   components/                    # 全局复用组件
-    ai-chat/                     #   AI 客服对话面板
     async-select/                #   异步下拉选择器（支持实体/字典数据源）
     async-cascader/              #   异步级联选择器
     conventional-menu/           #   通用侧边栏菜单
@@ -179,7 +178,7 @@ pnpm build
 import { createEntityModule } from '@/features/entities/_shared/create-entity-module';
 
 export default createEntityModule({
-  entityKey: 'chatRule',
+  entityKey: 'demoEntity',
   formComponent: defineAsyncComponent(() => import('./form/index.vue')),
   rowActions: { actionColumnWidth: 180 },
   tableActions: {
@@ -232,12 +231,6 @@ export default createEntityModule({
 
 | 模块                            | 说明          |
 | ------------------------------- | ------------- |
-| `chatRule`                      | AI 聊天规则   |
-| `chatCategory`                  | AI 聊天分类   |
-| `chatPrompt`                    | AI 聊天提示词 |
-| `chatKnowledge`                 | AI 知识库     |
-| `chatQuestion`                  | AI 聊天问题   |
-| `chatConversationLog`           | AI 对话日志   |
 | `meetingSession`                | 会议会话      |
 | `meetingParticipant`            | 会议参与者    |
 | `meetingSummary`                | 会议摘要      |
