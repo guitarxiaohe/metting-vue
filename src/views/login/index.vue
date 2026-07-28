@@ -11,7 +11,7 @@
       <div class="login-left__content">
         <div class="login-left__brand">
           <div class="login-left__logo">
-            <Sparkles :size="28" />
+            <img src="@/assets/logo.png" alt="" />
           </div>
           <h2 class="login-left__title">嘻嘻嘻</h2>
         </div>
@@ -426,7 +426,7 @@ const onQrLoginSuccess = async (_token: string) => {
   /* 在渐变上叠加半透明黑色层，使整体更暗 */
   background:
     linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)),
-    linear-gradient(135deg, #ff8c00 0%, #ff6600 40%, #cc5500 100%);
+    linear-gradient(135deg, #a1c1ff 0%, #a1c1ff 40%, #a1c1ff 100%);
   @media (max-width: 1024px) {
     display: none;
   }

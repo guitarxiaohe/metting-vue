@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="20" y1="14" x2="124" y2="130" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E8F0FF"/>
+      <stop offset="0.55" stop-color="#9AB8FF"/>
+      <stop offset="1" stop-color="#5E6AD2"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="18" y1="20" x2="124" y2="120" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#0048FF" stop-opacity="0.18"/>
+    </linearGradient>
+    <linearGradient id="markA" x1="44" y1="32" x2="72" y2="80" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F7FAFF"/>
+      <stop offset="1" stop-color="#8BB1FF"/>
+    </linearGradient>
+    <linearGradient id="markB" x1="63" y1="28" x2="89" y2="90" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#72A0FF"/>
+      <stop offset="1" stop-color="#0048FF"/>
+    </linearGradient>
+    <filter id="shadow" x="10" y="10" width="124" height="124" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#0048FF" flood-opacity="0.16"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#shadow)">
+    <circle cx="72" cy="72" r="54" fill="url(#bg)"/>
+    <circle cx="72" cy="72" r="53" stroke="url(#ring)" stroke-width="2"/>
+    <circle cx="72" cy="72" r="34" fill="#FFFFFF" fill-opacity="0.12"/>
+    <circle cx="72" cy="72" r="22" fill="#FFFFFF" fill-opacity="0.08"/>
+  </g>
+
+  <g transform="translate(50 39) scale(2.25)">
+    <path d="M0 5.30005V17.3L3.17508 19.1V11.0454L9.56006 14.7L16.0601 11.0454V18.8625L19.1601 17.153V5.33975L9.56006 10.6454L0 5.30005Z" fill="url(#markA)"/>
+    <path d="M19.1601 5.33975L9.56006 10.6454V14.7L16.0601 11.0454V18.8625L19.1601 17.153V5.33975Z" fill="url(#markB)"/>
+    <path d="M9.66013 4.95911e-05L3.26013 3.50005L6.36013 5.30005L9.66013 3.40005L13.0601 5.30005L16.1601 3.60005L9.66013 4.95911e-05Z" fill="url(#markA)"/>
+    <path d="M9.46553 22.6L5.61011 20.4V17L9.46553 19.149L13.6101 16.8V20.2L9.46553 22.6Z" fill="url(#markA)"/>
+    <path d="M13.6102 20.2001L9.46558 22.6001V19.1491L13.6102 16.8001V20.2001Z" fill="url(#markB)"/>
+  </g>
+
+  <g opacity="0.75">
+    <circle cx="46" cy="42" r="3" fill="#FFFFFF"/>
+    <circle cx="101" cy="46" r="2.5" fill="#FFFFFF"/>
+    <circle cx="104" cy="92" r="2.5" fill="#FFFFFF"/>
+  </g>
+</svg>
