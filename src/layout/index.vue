@@ -104,10 +104,12 @@ onUnmounted(() => {
           <el-header class="layout-header">
             <div class="layout-header__left">
               <span
+                v-if="isTopNav"
                 class="layout-header__brand cursor-pointer"
                 @click="$router.push('/')"
-                >XiaoHe</span
               >
+                <img class="w-[40px]" src="@/assets/logo.png" alt="" />
+              </span>
               <ConventionalMenu v-if="isTopNav" mode="top" />
             </div>
 

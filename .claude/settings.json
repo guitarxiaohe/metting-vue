@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git commit -m 'fix: 更新 logo 为图片，隐藏注册链接 *)"
+    ]
+  }
+}

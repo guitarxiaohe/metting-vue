@@ -188,7 +188,9 @@ function buildMenuItems(menus: SysRouter[]): ConventionalMenuItem[] {
     <div class="conventional-menu" :class="{ 'is-collapse': isCollapse }">
       <!-------------------------- 品牌区 -------------------------->
       <div class="conventional-menu__logo">
-        <span class="logo-icon">✨</span>
+        <span class="logo-icon">
+          <img src="@/assets/logo.png" alt="" />
+        </span>
         <span v-show="!isCollapse" class="logo-text">YourBrand</span>
       </div>
 
@@ -277,11 +279,7 @@ function buildMenuItems(menus: SysRouter[]): ConventionalMenuItem[] {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(
-      135deg,
-      var(--color-primary) 0%,
-      var(--color-primary-dark) 100%
-    );
+
     border-radius: 0.5rem;
     font-size: 1rem;
   }

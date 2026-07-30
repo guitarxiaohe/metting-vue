@@ -188,7 +188,7 @@
         </div>
 
         <!-- 注册链接 -->
-        <div class="signup-link">
+        <div class="signup-link" v-if="false">
           <button
             type="button"
             class="switch-link"
