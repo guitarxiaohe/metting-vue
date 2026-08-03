@@ -1,11 +1,15 @@
 import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios';
 import type { ApiResponse } from '@/types/api';
-import { useUserStore } from '@/stores';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { i18n } from '@/i18n';
 
 class HttpClient {
   private instance: AxiosInstance;
+  private isTokenExpired = false;
+  private pendingQueue: Array<{
+    resolve: (value: any) => void;
+    reject: (reason?: any) => void;
+  }> = [];
 
   constructor() {
     this.instance = axios.create({
@@ -43,10 +47,17 @@ class HttpClient {
     this.instance.interceptors.response.use(
       (response) => {
         if (response.data?.code === 401) {
-          const { t } = i18n.global;
-          // 统一错误处理
-          const { logout } = useUserStore();
+          // 如果已有 401 正在处理中，将后续请求放入队列阻塞
+          if (this.isTokenExpired) {
+            return new Promise((resolve, reject) => {
+              this.pendingQueue.push({ resolve, reject });
+            });
+          }
 
+          this.isTokenExpired = true;
+          const { t } = i18n.global;
+
+          // 统一错误处理：仅第一个 401 弹出对话框
           ElMessageBox.confirm(
             t('user.tokenExpiredDesc'),
             t('user.tokenExpired'),
@@ -57,12 +68,16 @@ class HttpClient {
             }
           )
             .then(() => {
-              logout();
+              // 用户确认 → 跳转登录页，同时 reject 所有排队请求
+              this.rejectPendingQueue(response.data);
               const fullPath =
                 window.location.pathname + window.location.search;
               window.location.href = `/login?redirect=${encodeURIComponent(fullPath)}`;
             })
-            .catch(() => {});
+            .catch(() => {
+              // 用户取消 → reject 所有排队请求
+              this.rejectPendingQueue(response.data);
+            });
           return Promise.reject(response.data);
         } else if (response.data?.code == 404) {
           ElMessage.error('未找到当前接口');
@@ -80,6 +95,14 @@ class HttpClient {
         return Promise.reject(error);
       }
     );
+  }
+
+  private rejectPendingQueue(data: any) {
+    this.isTokenExpired = false;
+    while (this.pendingQueue.length > 0) {
+      const { reject } = this.pendingQueue.shift()!;
+      reject(data);
+    }
   }
 
   private resolveErrorMessage(error: unknown) {
