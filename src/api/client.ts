@@ -2,7 +2,7 @@ import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios';
 import type { ApiResponse } from '@/types/api';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { i18n } from '@/i18n';
-
+import { useUserStore } from '@/stores';
 class HttpClient {
   private instance: AxiosInstance;
   private isTokenExpired = false;
@@ -68,6 +68,8 @@ class HttpClient {
             }
           )
             .then(() => {
+              const userStore = useUserStore();
+              userStore.logout(); // 调用登出方法，清除 token 等信息
               // 用户确认 → 跳转登录页，同时 reject 所有排队请求
               this.rejectPendingQueue(response.data);
               const fullPath =
