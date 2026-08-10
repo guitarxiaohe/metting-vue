@@ -3,6 +3,7 @@ import { useI18n } from 'vue-i18n';
 import AsyncSelect from '@/components/async-select/async-select.vue';
 import type { EntityFilterFieldConfig } from '@/types/entity-config';
 import type { FilterFormValue } from '@/features/multiview/types';
+import { resolveSafeComponent } from '@/utils/vue-component';
 
 /******************************** 组件入参 ********************************/
 
@@ -35,6 +36,11 @@ const formModel = defineModel<Record<string, FilterFormValue>>({
 // 同步自定义组件的筛选值
 function updateCustomFieldValue(key: string, value: unknown) {
   formModel.value[key] = value as FilterFormValue;
+}
+
+// 自定义筛选组件增加兜底，避免非法配置导致浏览器直接抛错
+function resolveFieldComponent(field: EntityFilterFieldConfig) {
+  return resolveSafeComponent(field.renderComponent);
 }
 </script>
 
@@ -105,8 +111,10 @@ function updateCustomFieldValue(key: string, value: unknown) {
         />
 
         <component
-          :is="field.renderComponent"
-          v-else-if="field.component === 'custom' && field.renderComponent"
+          :is="resolveFieldComponent(field)"
+          v-else-if="
+            field.component === 'custom' && resolveFieldComponent(field)
+          "
           :model-value="(formModel[field.key] ?? null) as any"
           v-bind="field.componentProps"
           @update:model-value="updateCustomFieldValue(field.key, $event)"

@@ -176,6 +176,7 @@ import {
   resolveBackendFilterFields,
   resolveFallbackFilterFields,
 } from '@/features/entities/_shared/resolve-entity-filters';
+import { resolveSafeComponent } from '@/utils/vue-component';
 
 /******************************** 类型 ********************************/
 
@@ -313,9 +314,9 @@ function isTableActionConfig(action: any): action is {
 // 获取表格操作按钮的组件
 function getHeaderActionComponent(action: any) {
   if (isTableActionConfig(action)) {
-    return action.component;
+    return resolveSafeComponent(action.component);
   }
-  return action;
+  return resolveSafeComponent(action);
 }
 
 const tableConfig = computed<EntityTableConfig>(() =>

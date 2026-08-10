@@ -115,6 +115,7 @@ import type {
 import { formatCellText } from './utils/column-utils';
 import type { EntityTableChildConfig } from '@/types/entity-config';
 import RowDetailChildTable from './row-detail-child-table.vue';
+import { resolveSafeComponent } from '@/utils/vue-component';
 
 /******************************** 行详情抽屉（当前页 dataList 内上一条 / 下一条） ********************************/
 
@@ -170,7 +171,10 @@ const DetailRender = defineComponent({
         ? renderProps.content
         : typeof renderProps.content === 'object' ||
             typeof renderProps.content === 'function'
-          ? h(renderProps.content)
+          ? (() => {
+              const component = resolveSafeComponent(renderProps.content);
+              return component ? h(component) : h('span', {}, '--');
+            })()
           : h('span', {}, String(renderProps.content ?? '--'));
   },
 });

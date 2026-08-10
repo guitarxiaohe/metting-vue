@@ -27,6 +27,7 @@ import type {
   EntityTableChildRelationFieldConfig,
 } from '@/types/entity-config';
 import type { FilterFormValue } from '@/features/multiview/types';
+import { resolveSafeComponent } from '@/utils/vue-component';
 
 /******************************** 组件入参 ********************************/
 
@@ -44,7 +45,10 @@ const CellRender = defineComponent({
         ? renderProps.content
         : typeof renderProps.content === 'object' ||
             typeof renderProps.content === 'function'
-          ? h(renderProps.content)
+          ? (() => {
+              const component = resolveSafeComponent(renderProps.content);
+              return component ? h(component) : h('span', {}, '--');
+            })()
           : h('span', {}, String(renderProps.content ?? '--'));
   },
 });

@@ -4,6 +4,7 @@ import type {
   RowActionRenderConfig,
   RowActionRuntimeActions,
 } from '@/features/entities/_shared/row-actions-types';
+import { resolveSafeComponent } from '@/utils/vue-component';
 
 /******************************** 组件入参 ********************************/
 
@@ -36,6 +37,10 @@ function runBuiltinAction(action: RowActionRenderConfig) {
   if (!action.actionKey) return;
   void props.actions[action.actionKey]?.(props.row);
 }
+
+function resolveActionComponent(action: RowActionRenderConfig) {
+  return resolveSafeComponent(action.component);
+}
 </script>
 
 <template>
@@ -43,8 +48,8 @@ function runBuiltinAction(action: RowActionRenderConfig) {
     <!-------------------------- 主要按钮 -------------------------->
     <template v-for="action in props.primaryActions" :key="action.key">
       <component
-        :is="action.component"
-        v-if="action.component"
+        :is="resolveActionComponent(action)"
+        v-if="resolveActionComponent(action)"
         :row="props.row"
         :actions="props.actions"
         @refresh="onRefresh"
@@ -74,8 +79,8 @@ function runBuiltinAction(action: RowActionRenderConfig) {
             :key="action.key"
           >
             <component
-              :is="action.component"
-              v-if="action.component"
+              :is="resolveActionComponent(action)"
+              v-if="resolveActionComponent(action)"
               :row="props.row"
               :actions="props.actions"
               @refresh="onRefresh"

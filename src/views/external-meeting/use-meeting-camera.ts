@@ -216,7 +216,7 @@ export function useMeetingCamera(options: UseMeetingCameraOptions) {
 
   onBeforeUnmount(() => {
     window.removeEventListener('pagehide', handleCameraPageHide);
-    document.addEventListener('visibilitychange', handleCameraPageHide);
+    document.removeEventListener('visibilitychange', handleCameraPageHide);
     window.removeEventListener('beforeunload', handleCameraPageHide);
     // clearCameraTrack()
   });
