@@ -47,7 +47,7 @@ export interface MeetingTranscriptBlock {
   id: string;
   /** 类型：'speaker' 已确认转写 | 'pending' 流式进行中 */
   kind: MeetingTranscriptBlockKind;
-  /** 说话人标签，如 "张三提到" / "张三补充" */
+  /** 说话人标签 */
   label: string;
   /** 转写文本内容 */
   text: string;

@@ -2,7 +2,7 @@ import { defineConfig, loadEnv } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import tailwindcss from '@tailwindcss/vite';
 import { resolve } from 'path';
-
+import { versionPlugin } from './public/vites/vite-plugin-version';
 /******************************** vite 配置 ********************************/
 // 读取环境变量并返回开发配置
 export default defineConfig(({ mode }) => {
@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => {
   const proxyPrefix = env.VITE_APP_BASE_API || '/dev-api';
 
   return {
-    plugins: [vue(), tailwindcss()],
+    plugins: [vue(), tailwindcss(), versionPlugin()],
     resolve: {
       alias: {
         '@': resolve(__dirname, 'src'),

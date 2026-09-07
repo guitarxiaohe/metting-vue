@@ -102,6 +102,9 @@ importers:
       '@vue/tsconfig':
         specifier: ^0.9.0
         version: 0.9.1(typescript@5.9.3)(vue@3.5.31(typescript@5.9.3))
+      child_process:
+        specifier: ^1.0.2
+        version: 1.0.2
       eslint:
         specifier: ^10.2.1
         version: 10.2.1(jiti@2.6.1)
@@ -1262,6 +1265,9 @@ packages:
   chai@6.2.2:
     resolution: {integrity: sha512-NUPRluOfOiTKBKvWPtSD4PhFvWCqOi0BGStNWs57X9js7XGTprSmFoz5F0tWhR4WPjNeR9jXqdC7/UpSJTnlRg==}
     engines: {node: '>=18'}
+
+  child_process@1.0.2:
+    resolution: {integrity: sha512-Wmza/JzL0SiWz7kl6MhIKT5ceIlnFPJX+lwUGj7Clhy5MMldsSoJR0+uvRzOS5Kv45Mq7t1PoE8TsOA9bzvb6g==}
 
   chokidar@4.0.3:
     resolution: {integrity: sha512-Qgzu8kfBvo+cA4962jnP1KkS6Dop5NS6g7R5LFYJr4b8Ub94PPQXUksCw9PvXoeXPRRddRNC5C1JQUR2SMGtnA==}
@@ -3568,6 +3574,8 @@ snapshots:
       crc-32: 1.2.2
 
   chai@6.2.2: {}
+
+  child_process@1.0.2: {}
 
   chokidar@4.0.3:
     dependencies:

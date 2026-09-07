@@ -6,7 +6,7 @@ import { useSystemStore } from '@/stores';
 import zhCn from 'element-plus/es/locale/lang/zh-cn';
 import en from 'element-plus/es/locale/lang/en';
 import zhTw from 'element-plus/es/locale/lang/zh-tw';
-
+import UpdateNotification from '@/components/UpdateNotification.vue';
 const systemStore = useSystemStore();
 
 const elementLocale = computed(() => {
@@ -28,5 +28,7 @@ const showFloatingSettings = computed(
     <SettingsPanel v-if="showFloatingSettings" floating />
     <ForcePasswordDialog />
     <router-view></router-view>
+    <!-- 全局更新通知组件 -->
+    <UpdateNotification />
   </el-config-provider>
 </template>

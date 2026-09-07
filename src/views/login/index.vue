@@ -21,6 +21,14 @@
         <div class="login-left__features">
           <div class="login-left__feature">
             <div class="feature-dot" />
+            <span>还有很多bug，最近恋爱了没时间修复～</span>
+          </div>
+          <div class="login-left__feature">
+            <div class="feature-dot" />
+            <span>千问的 AI 音频转写文字也到期了没钱续命</span>
+          </div>
+          <div class="login-left__feature">
+            <div class="feature-dot" />
             <span>{{ t('login.feature1') }}</span>
           </div>
           <div class="login-left__feature">

@@ -11,8 +11,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "pre-commit:check": "pnpm type-check && pnpm format:check",
-    "build": "vue-tsc -b && vite build",
-    "build:prod": "vue-tsc -b && vite build --mode production",
+    "build": "vue-tsc -b && node scripts/generateVersion.js && vite build",
+    "build:prod": "vue-tsc -b && node scripts/generateVersion.js&& vite build --mode production",
     "preview": "vite preview",
     "prepare": "husky"
   },
@@ -49,6 +49,7 @@
     "@types/qrcode": "^1.5.6",
     "@vitejs/plugin-vue": "^6.0.5",
     "@vue/tsconfig": "^0.9.0",
+    "child_process": "^1.0.2",
     "eslint": "^10.2.1",
     "eslint-plugin-prettier": "^5.5.5",
     "eslint-plugin-vue": "^10.9.0",
