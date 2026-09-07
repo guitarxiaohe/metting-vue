@@ -246,7 +246,7 @@ const genderIconSize = computed(() =>
 const mergedAvatarProps = computed(() => ({
   ...props.avatar,
   size: props.size,
-  src: resolveImageUrl(props.src || '--'),
+  src: resolveImageUrl(props.src || ''),
   shape: 'circle',
 }));
 

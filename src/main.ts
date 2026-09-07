@@ -13,6 +13,7 @@ import { i18n } from './i18n';
 import { initSystem } from './stores';
 import { createPersistPlugin } from './stores/plugins/persist';
 import { queryClient } from '@/api/query-client';
+import './utils/isChromUtils.ts';
 const app = createApp(App);
 
 // Pinia
